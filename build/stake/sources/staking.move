@@ -310,6 +310,38 @@ module stake::staking {
         plan.is_active = is_active;
     }
 
+    public entry fun add_staking_plan(
+        _admin_cap: &AdminCap,
+        pool: &mut StakingPool,
+        duration: u64,
+        apy: u64,
+        is_active: bool
+    ) {
+        let index  = vector::length(&pool.staking_plans);
+        vector::push_back(&mut pool.staking_plans, StakingPlan {
+            index,
+            duration,
+            apy,
+            is_active
+        });
+    }
+
+    public entry fun set_early_unstake_penalty_rate(
+        _admin_cap: &AdminCap,
+        pool: &mut StakingPool,
+        rate: u64
+    ) {
+        pool.early_unstake_penalty_rate = rate;
+    }
+
+    public entry fun set_unstake_delay(
+        _admin_cap: &AdminCap,
+        pool: &mut StakingPool,
+        delay: u64
+    ) {
+        pool.unstake_delay = delay;
+    }
+
     // View functions
     public fun get_stake_info(pool: &StakingPool, user: address, stake_index: u64): (u64, u64, u64, u64) {
         assert!(table::contains(&pool.stakes, user), EStakerDoesNotExist);
