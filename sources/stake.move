@@ -23,7 +23,6 @@ module stake::staking {
     const PERIOD_180_DAYS: u64 = 180 * SECONDS_PER_DAY;
     const PERIOD_365_DAYS: u64 = 365 * SECONDS_PER_DAY;
 
-
     public struct AdminCap has key, store {
        id: UID,
     }
@@ -221,7 +220,6 @@ module stake::staking {
     }
 
     public entry fun process_unstake(
-        _admin_cap: &AdminCap,
         pool: &mut StakingPool,
         stake_index: u64,
         clock: &Clock,
@@ -276,6 +274,108 @@ module stake::staking {
             penalty: request.penalty_amount
         });
     }
+
+    public entry fun process_all_unstakes(
+    _admin_cap: &AdminCap,
+    pool: &mut StakingPool,
+    users: vector<address>,
+    stake_indices: vector<u64>,
+    clock: &Clock,
+    ctx: &mut TxContext
+) {
+    // Validate input vectors have same length
+    assert!(vector::length(&users) == vector::length(&stake_indices), 0);
+    
+    let mut i = 0;
+    let len = vector::length(&users);
+    
+    while (i < len) {
+        let user = *vector::borrow(&users, i);
+        let stake_index = *vector::borrow(&stake_indices, i);
+        
+        // Skip if user doesn't have stakes
+        if (!table::contains(&pool.stakes, user)) {
+            i = i + 1;
+            continue
+        };
+        
+        let user_stakes = table::borrow_mut(&mut pool.stakes, user);
+        
+        // Skip if stake index is invalid
+        if (stake_index >= table::length(user_stakes)) {
+            i = i + 1;
+            continue
+        };
+        
+        let stake = table::borrow_mut(user_stakes, stake_index);
+        
+        // Skip if stake is not in UnstakeRequested state
+        if (stake.state != 1) {
+            i = i + 1;
+            continue
+        };
+        
+        // Skip if user doesn't have unstake requests
+        if (!table::contains(&pool.unstake_requests, user)) {
+            i = i + 1;
+            continue
+        };
+        
+        let user_requests = table::borrow(&pool.unstake_requests, user);
+        
+        // Skip if this stake index doesn't have an unstake request
+        if (!table::contains(user_requests, stake_index)) {
+            i = i + 1;
+            continue
+        };
+        
+        let request = table::borrow(user_requests, stake_index);
+        let current_time = clock::timestamp_ms(clock) / 1000;
+        
+        // Skip if unstake delay hasn't been met
+        if (current_time < request.request_time + pool.unstake_delay) {
+            i = i + 1;
+            continue
+        };
+        
+        // Calculate reward if applicable
+        let reward = if (current_time >= stake.end_time && request.penalty_amount == 0) {
+            calculate_reward(stake)
+        } else {
+            0
+        };
+        
+        let amount_to_return = stake.amount - request.penalty_amount;
+        
+        // Transfer tokens
+        let mut return_coins = coin::take(&mut pool.staking_balance, amount_to_return, ctx);
+        
+        if (reward > 0) {
+            let reward_coins = coin::take(&mut pool.reward_pool, reward, ctx);
+            coin::join(&mut return_coins, reward_coins);
+        };
+        
+        transfer::public_transfer(return_coins, user);
+        
+        // Update state
+        stake.state = 2; // Withdrawn
+        pool.total_staked = pool.total_staked - stake.amount;
+        
+        if (request.penalty_amount > 0) {
+            let penalty_coins = coin::take(&mut pool.staking_balance, request.penalty_amount, ctx);
+            coin::put(&mut pool.reward_pool, penalty_coins);
+        };
+        
+        event::emit(UnstakedEvent {
+            user,
+            amount: amount_to_return,
+            reward,
+            penalty: request.penalty_amount
+        });
+        
+        i = i + 1;
+    }
+}
 
     fun calculate_reward(stake: &Stake): u64 {
         (stake.amount * stake.plan.apy * stake.plan.duration) / (DAYS_PER_YEAR * SECONDS_PER_DAY * SCALE)
