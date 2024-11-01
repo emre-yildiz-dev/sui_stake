@@ -1,0 +1,33 @@
+---
+compiled_package_info:
+  package_name: stake
+  address_alias_instantiation:
+    package: 6191d8290c1ffb048a61922657a7171f14eb003e644ee6c45ab2b2204200acab
+    stake: "0000000000000000000000000000000000000000000000000000000000000000"
+    std: "0000000000000000000000000000000000000000000000000000000000000001"
+    sui: "0000000000000000000000000000000000000000000000000000000000000002"
+    tiu: 6191d8290c1ffb048a61922657a7171f14eb003e644ee6c45ab2b2204200acab
+  source_digest: D186F3B27DE832540D4EE6CE942096A8985E6DD83318221FD3C7ABD22E4ED557
+  build_flags:
+    dev_mode: false
+    test_mode: false
+    generate_docs: false
+    install_dir: ~
+    force_recompilation: false
+    lock_file: "./Move.lock"
+    fetch_deps_only: false
+    skip_fetch_latest_git_deps: false
+    default_flavor: sui
+    default_edition: ~
+    deps_as_root: false
+    silence_warnings: false
+    warnings_are_errors: false
+    json_errors: false
+    additional_named_addresses: {}
+    lint_flag:
+      no_lint: false
+      lint: false
+dependencies:
+  - MoveStdlib
+  - Sui
+  - tiu
