@@ -7,8 +7,10 @@ module stake::staking {
     use tiu::tiu::TIU;
 
     // Error codes
-    const EInvalidStakePeriod: u64 = 0;
-    const EStakingIsPaused: u64 = 2;
+    const EStakerDoesNotExist: u64 = 0;
+    const EInvalidStakePeriod: u64 = 1;
+    const EInvalidPlanIndex: u64 = 2;
+    const EStakingIsPaused: u64 = 3;
     const EUnstakeDelayNotMet: u64 = 4;
 
     // Constants
@@ -37,7 +39,6 @@ module stake::staking {
         unstake_delay: u64,
         early_unstake_penalty_rate: u64,
         is_paused: bool,
-        admin: address
     }
 
     public struct StakingPlan has copy, store {
@@ -85,11 +86,13 @@ module stake::staking {
 
     // Entry function
     fun init(ctx: &mut TxContext) {
+        let sender = tx_context::sender(ctx);
+
         // Create and transfer admin cap
-        create_and_transfer_admin_cap(tx_context::sender(ctx), ctx);
+        create_and_transfer_admin_cap(sender, ctx);
 
         // Initialize and transfer staking pool
-        initialize_staking_pool_and_transfer(tx_context::sender(ctx), ctx);
+        initialize_staking_pool_and_transfer(ctx);
     }
 
     fun create_and_transfer_admin_cap(sender: address, ctx: &mut TxContext) {
@@ -99,7 +102,7 @@ module stake::staking {
         transfer::public_transfer(admin_cap, sender);
     }
 
-    fun initialize_staking_pool_and_transfer(sender: address, ctx: &mut TxContext) {
+    fun initialize_staking_pool_and_transfer(ctx: &mut TxContext) {
      let staking_pool = StakingPool {
             id: object::new(ctx),
             staking_balance: balance::zero(),
@@ -115,7 +118,6 @@ module stake::staking {
             unstake_delay: 1 * SECONDS_PER_DAY, // 1 day
             early_unstake_penalty_rate: 1000, // 10%
             is_paused: false,
-            admin: sender
         };
         transfer::share_object(staking_pool);
     }
@@ -180,6 +182,7 @@ module stake::staking {
         ctx: &mut TxContext
     ) {
         let sender = tx_context::sender(ctx);
+        assert!(table::contains(&pool.stakes, sender), EStakerDoesNotExist);
         let user_stakes = table::borrow_mut(&mut pool.stakes, sender);
         assert!(stake_index < table::length(user_stakes), EInvalidStakePeriod);
 
@@ -280,19 +283,17 @@ module stake::staking {
 
     // Admin functions
     public entry fun add_to_reward_pool(
+        _admin_cap: &AdminCap,
         pool: &mut StakingPool,
-        coin: Coin<TIU>,
-        ctx: &mut TxContext
+        coin: Coin<TIU>
     ) {
-        assert!(tx_context::sender(ctx) == pool.admin, 0);
         coin::put(&mut pool.reward_pool, coin);
     }
 
     public entry fun toggle_pause(
+        _admin_cap: &AdminCap,
         pool: &mut StakingPool,
-        ctx: &mut TxContext
     ) {
-        assert!(tx_context::sender(ctx) == pool.admin, 0);
         pool.is_paused = !pool.is_paused;
     }
 
@@ -301,10 +302,9 @@ module stake::staking {
         pool: &mut StakingPool,
         index: u64,
         apy: u64,
-        is_active: bool,
-        ctx: &mut TxContext
+        is_active: bool
     ) {
-        assert!(tx_context::sender(ctx) == pool.admin, 0);
+        assert!(index < vector::length(&pool.staking_plans), EInvalidPlanIndex);
         let plan = vector::borrow_mut(&mut pool.staking_plans, index);
         plan.apy = apy;
         plan.is_active = is_active;
@@ -312,6 +312,7 @@ module stake::staking {
 
     // View functions
     public fun get_stake_info(pool: &StakingPool, user: address, stake_index: u64): (u64, u64, u64, u64) {
+        assert!(table::contains(&pool.stakes, user), EStakerDoesNotExist);
         let user_stakes = table::borrow(&pool.stakes, user);
         let stake = table::borrow(user_stakes, stake_index);
         (stake.amount, stake.start_time, stake.end_time, stake.plan.duration)
