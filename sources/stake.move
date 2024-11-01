@@ -41,6 +41,14 @@ module stake::staking {
         is_paused: bool,
     }
 
+    public struct AllStakesResponse has copy, drop {
+        stakes: vector<StakeInfo>
+    }
+
+    public struct AllUnstakeRequestsResponse has copy, drop {
+        unstake_requests: vector<UnstakeRequestInfo>
+    }
+
     public struct StakingPlan has copy, store {
         index: u64,
         duration: u64,
@@ -58,6 +66,25 @@ module stake::staking {
     }
 
     public struct UnstakeRequest has store {
+        user: address,
+        stake_index: u64,
+        request_time: u64,
+        penalty_amount: u64
+    }
+
+    public struct StakeInfo has copy, drop {
+        user: address,
+        stake_index: u64,
+        amount: u64,
+        start_time: u64,
+        end_time: u64,
+        plan_index: u64,
+        plan_duration: u64,
+        plan_apy: u64,
+        state: u8
+    }
+
+    public struct UnstakeRequestInfo has copy, drop {
         user: address,
         stake_index: u64,
         request_time: u64,
@@ -219,6 +246,200 @@ module stake::staking {
             penalty_amount
         });
     }
+
+    // Function to get all stakes for specified users
+    public fun get_all_stakes(
+        pool: &StakingPool, 
+        users: vector<address>
+    ): AllStakesResponse {
+        let mut stakes_vec = vector::empty<StakeInfo>();
+        let mut i = 0;
+        let users_len = vector::length(&users);
+        
+        while (i < users_len) {
+            let user = *vector::borrow(&users, i);
+            
+            // Skip if user doesn't have stakes
+            if (!table::contains(&pool.stakes, user)) {
+                i = i + 1;
+                continue
+            };
+            
+            let user_stakes = table::borrow(&pool.stakes, user);
+            let mut j = 0;
+            
+            // Iterate through all possible stake indices for this user
+            while (j < table::length(user_stakes)) {
+                let stake = table::borrow(user_stakes, j);
+                
+                vector::push_back(&mut stakes_vec, StakeInfo {
+                    user: stake.user,
+                    stake_index: j,
+                    amount: stake.amount,
+                    start_time: stake.start_time,
+                    end_time: stake.end_time,
+                    plan_index: stake.plan.index,
+                    plan_duration: stake.plan.duration,
+                    plan_apy: stake.plan.apy,
+                    state: stake.state
+                });
+                
+                j = j + 1;
+            };
+            
+            i = i + 1;
+        };
+        
+        AllStakesResponse { stakes: stakes_vec }
+    }
+
+        // Helper function to get stakes for a single user
+    public fun get_user_stakes(
+        pool: &StakingPool,
+        user: address
+    ): AllStakesResponse {
+        let mut stakes_vec = vector::empty<StakeInfo>();
+        
+        if (table::contains(&pool.stakes, user)) {
+            let user_stakes = table::borrow(&pool.stakes, user);
+            let mut i = 0;
+            
+            while (i < table::length(user_stakes)) {
+                let stake = table::borrow(user_stakes, i);
+                
+                vector::push_back(&mut stakes_vec, StakeInfo {
+                    user: stake.user,
+                    stake_index: i,
+                    amount: stake.amount,
+                    start_time: stake.start_time,
+                    end_time: stake.end_time,
+                    plan_index: stake.plan.index,
+                    plan_duration: stake.plan.duration,
+                    plan_apy: stake.plan.apy,
+                    state: stake.state
+                });
+                
+                i = i + 1;
+            };
+        };
+        
+        AllStakesResponse { stakes: stakes_vec }
+    }
+
+    // Function to get all unstake requests for specified users
+    public fun get_all_unstake_requests(
+        pool: &StakingPool,
+        users: vector<address>
+    ): AllUnstakeRequestsResponse {
+        let mut requests_vec = vector::empty<UnstakeRequestInfo>();
+        let mut i = 0;
+        let users_len = vector::length(&users);
+        
+        while (i < users_len) {
+            let user = *vector::borrow(&users, i);
+            
+            // Skip if user doesn't have unstake requests
+            if (!table::contains(&pool.unstake_requests, user)) {
+                i = i + 1;
+                continue
+            };
+            
+            let user_requests = table::borrow(&pool.unstake_requests, user);
+            let mut j = 0;
+            
+            // Iterate through all possible request indices for this user
+            while (j < table::length(user_requests)) {
+                let request = table::borrow(user_requests, j);
+                
+                vector::push_back(&mut requests_vec, UnstakeRequestInfo {
+                    user: request.user,
+                    stake_index: request.stake_index,
+                    request_time: request.request_time,
+                    penalty_amount: request.penalty_amount
+                });
+                
+                j = j + 1;
+            };
+            
+            i = i + 1;
+        };
+        
+        AllUnstakeRequestsResponse { unstake_requests: requests_vec }
+    }
+
+    // Helper function to get unstake requests for a single user
+    public fun get_user_unstake_requests(
+        pool: &StakingPool,
+        user: address
+    ): AllUnstakeRequestsResponse {
+        let mut requests_vec = vector::empty<UnstakeRequestInfo>();
+        
+        if (table::contains(&pool.unstake_requests, user)) {
+            let user_requests = table::borrow(&pool.unstake_requests, user);
+            let mut i = 0;
+            
+            while (i < table::length(user_requests)) {
+                let request = table::borrow(user_requests, i);
+                
+                vector::push_back(&mut requests_vec, UnstakeRequestInfo {
+                    user: request.user,
+                    stake_index: request.stake_index,
+                    request_time: request.request_time,
+                    penalty_amount: request.penalty_amount
+                });
+                
+                i = i + 1;
+            };
+        };
+        
+        AllUnstakeRequestsResponse { unstake_requests: requests_vec }
+    }
+
+    // Helper function to get claimable unstake requests
+    public fun get_claimable_unstake_requests(
+        pool: &StakingPool,
+        users: vector<address>,
+        clock: &Clock
+    ): AllUnstakeRequestsResponse {
+        let mut requests_vec = vector::empty<UnstakeRequestInfo>();
+        let current_time = clock::timestamp_ms(clock) / 1000;
+        let mut i = 0;
+        let users_len = vector::length(&users);
+        
+        while (i < users_len) {
+            let user = *vector::borrow(&users, i);
+            
+            // Skip if user doesn't have unstake requests
+            if (!table::contains(&pool.unstake_requests, user)) {
+                i = i + 1;
+                continue
+            };
+            
+            let user_requests = table::borrow(&pool.unstake_requests, user);
+            let mut j = 0;
+            
+            while (j < table::length(user_requests)) {
+                let request = table::borrow(user_requests, j);
+                
+                // Only include requests that have met the unstake delay
+                if (current_time >= request.request_time + pool.unstake_delay) {
+                    vector::push_back(&mut requests_vec, UnstakeRequestInfo {
+                        user: request.user,
+                        stake_index: request.stake_index,
+                        request_time: request.request_time,
+                        penalty_amount: request.penalty_amount
+                    });
+                };
+                
+                j = j + 1;
+            };
+            
+            i = i + 1;
+        };
+        
+        AllUnstakeRequestsResponse { unstake_requests: requests_vec }
+    }
+
 
     public entry fun process_unstake(
         _admin_cap: &AdminCap,
