@@ -62,7 +62,13 @@ module stake::staking {
         start_time: u64,
         end_time: u64,
         plan: StakingPlan,
-        state: u8 // 0: Staked, 1: UnstakeRequested, 2: Withdrawn
+        state: StakeState
+    }
+
+    public enum StakeState has copy, store, drop {
+        Staked,
+        UnstakeRequested,
+        Withdrawn
     }
 
     public struct UnstakeRequest has store {
@@ -81,7 +87,7 @@ module stake::staking {
         plan_index: u64,
         plan_duration: u64,
         plan_apy: u64,
-        state: u8
+        state: StakeState
     }
 
     public struct UnstakeRequestInfo has copy, drop {
@@ -188,7 +194,7 @@ module stake::staking {
             start_time: current_time,
             end_time: current_time + plan.duration,
             plan: plan,
-            state: 0 // Staked
+            state: StakeState::Staked
         };
 
         table::add(user_stakes, stake_id, stake);
@@ -214,7 +220,7 @@ module stake::staking {
         assert!(stake_index < table::length(user_stakes), EInvalidStakePeriod);
 
         let stake = table::borrow_mut(user_stakes, stake_index);
-        assert!(stake.state == 0, EInvalidStakePeriod); // Must be in Staked state
+        assert!(stake.state == StakeState::Staked, EInvalidStakePeriod); // Must be in Staked state
 
         let current_time = clock::timestamp_ms(clock) / 1000;
         let penalty_amount = if (current_time < stake.end_time) {
@@ -223,7 +229,7 @@ module stake::staking {
             0
         };
 
-        stake.state = 1; // UnstakeRequested
+        stake.state = StakeState::UnstakeRequested; // UnstakeRequested
 
         // Initialize user's unstake request table if needed
         if (!table::contains(&pool.unstake_requests, sender)) {
@@ -452,7 +458,7 @@ module stake::staking {
         let user_stakes = table::borrow_mut(&mut pool.stakes, sender);
         let stake = table::borrow_mut(user_stakes, stake_index);
         
-        assert!(stake.state == 1, EInvalidStakePeriod); // Must be in UnstakeRequested state
+        assert!(stake.state == StakeState::UnstakeRequested, EInvalidStakePeriod); // Must be in UnstakeRequested state
 
         let user_requests = table::borrow(&pool.unstake_requests, sender);
         let request = table::borrow(user_requests, stake_index);
@@ -482,7 +488,7 @@ module stake::staking {
         transfer::public_transfer(return_coins, sender);
 
         // Update state
-        stake.state = 2; // Withdrawn
+        stake.state = StakeState::Withdrawn; // Withdrawn
         pool.total_staked = pool.total_staked - stake.amount;
 
         if (request.penalty_amount > 0) {
