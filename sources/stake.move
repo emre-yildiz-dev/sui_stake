@@ -32,8 +32,8 @@ module stake::staking {
 
     // Configuration constants
     const MIN_STAKE_AMOUNT: u64 = 100 * 10^COIN_DECIMALS; // 100 tokens with 6 decimals
-    const MAX_STAKE_AMOUNT: u64 = 100000 * 10^COIN_DECIMALS; // 100,000 tokens
-    const MAX_POOL_BALANCE: u64 = 10000000 * 10^COIN_DECIMALS; // 10M tokens
+    const MAX_STAKE_AMOUNT: u64 = 100_000_000_000 * 10^COIN_DECIMALS; // 100,000 tokens
+    const MAX_POOL_BALANCE: u64 = 10_000_000_000_000 * 10^COIN_DECIMALS; // 10 Trillion tokens
     const MAX_STAKES_PER_USER: u64 = 10;
 
     public struct AdminCap has key, store {
@@ -85,6 +85,13 @@ module stake::staking {
         Withdrawn
     }
 
+    public struct StakeMetadata has key, store {
+        id: UID,
+        coin_package: address,
+        coin_type: vector<u8>,
+        coin_decimals: u64,
+    }
+
     // Enhanced Events
     public struct StakeEvent has copy, drop {
         user: address,
@@ -128,8 +135,22 @@ module stake::staking {
 
     fun init(ctx: &mut TxContext) {
         let sender = tx_context::sender(ctx);
+        initialize_staking_metadata(ctx);
         create_and_transfer_admin_cap(sender, ctx);
         initialize_staking_pool_and_transfer(ctx);
+    }
+
+    fun initialize_staking_metadata(ctx: &mut TxContext) {
+        let tiu_package = @tui_package;
+        let mut tiu_package_str = tiu_package.to_string();
+        tiu_package_str.append_utf8(b"::tiu::TIU");
+        let staking_metadata = StakeMetadata {
+            id: object::new(ctx),
+            coin_package: @tui_package,
+            coin_type: *tiu_package_str.as_bytes(),
+            coin_decimals: COIN_DECIMALS,
+        };
+        transfer::freeze_object(staking_metadata);
     }
 
     fun create_and_transfer_admin_cap(sender: address, ctx: &mut TxContext) {
@@ -140,6 +161,8 @@ module stake::staking {
     }
 
     fun initialize_staking_pool_and_transfer(ctx: &mut TxContext) {
+ 
+
         let staking_pool = StakingPool {
             id: object::new(ctx),
             staking_balance: balance::zero(),
