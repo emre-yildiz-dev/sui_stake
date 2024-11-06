@@ -52,6 +52,22 @@ module stake::staking {
         early_unstake_penalty_rate: u64,
         is_paused: bool,
         emergency_mode: bool,
+        min_stake_amount: u64,
+        max_stake_amount: u64,
+        max_pool_balance: u64,
+        max_stakes_per_user: u64,
+    }
+
+    public struct StakingPoolInfo has copy, store {
+        total_staked: u64,
+        staking_balance: u64,
+        reward_pool_balance: u64,
+        is_paused: bool,
+        emergency_mode: bool,
+        min_stake_amount: u64,
+        max_stake_amount: u64,
+        max_pool_balance: u64,
+        max_stakes_per_user: u64,
     }
 
     public struct StakingPlan has copy, store {
@@ -133,6 +149,14 @@ module stake::staking {
         timestamp: u64
     }
 
+    public struct PoolLimitsUpdateEvent has copy, drop {
+        new_min_stake: u64,
+        new_max_stake: u64,
+        new_pool_balance: u64,
+        new_max_stakes: u64,
+        timestamp: u64
+    }
+
     fun init(ctx: &mut TxContext) {
         let sender = tx_context::sender(ctx);
         initialize_staking_metadata(ctx);
@@ -161,8 +185,6 @@ module stake::staking {
     }
 
     fun initialize_staking_pool_and_transfer(ctx: &mut TxContext) {
- 
-
         let staking_pool = StakingPool {
             id: object::new(ctx),
             staking_balance: balance::zero(),
@@ -200,6 +222,10 @@ module stake::staking {
             early_unstake_penalty_rate: 1000,
             is_paused: false,
             emergency_mode: false,
+            min_stake_amount: MIN_STAKE_AMOUNT,
+            max_stake_amount: MAX_STAKE_AMOUNT,
+            max_pool_balance: MAX_POOL_BALANCE,
+            max_stakes_per_user: MAX_STAKES_PER_USER,
         };
         transfer::share_object(staking_pool);
     }
@@ -223,14 +249,14 @@ module stake::staking {
         
         let plan = *vector::borrow(plans, plan_index);
         assert!(plan.is_active, EInvalidStakePeriod);
-        assert!(amount >= plan.min_stake_amount, EInvalidAmount);
-        assert!(amount <= plan.max_stake_amount, EInvalidAmount);
-        assert!(pool.total_staked + amount <= MAX_POOL_BALANCE, EPoolLimitExceeded);
+        assert!(amount >= pool.min_stake_amount, EInvalidAmount);
+        assert!(amount <= pool.max_stake_amount, EInvalidAmount);
+        assert!(pool.total_staked + amount <= pool.max_pool_balance, EPoolLimitExceeded);
 
         // Check user's stake count
         if (table::contains(&pool.stakes, sender)) {
             let user_stakes = table::borrow(&pool.stakes, sender);
-            assert!(table::length(user_stakes) < MAX_STAKES_PER_USER, EMaxStakesReached);
+            assert!(table::length(user_stakes) < pool.max_stakes_per_user, EMaxStakesReached);
         };
 
         // Transfer tokens
@@ -440,15 +466,18 @@ module stake::staking {
         });
     }
 
-  // Continuing from get_pool_info...
-    public fun get_pool_info(pool: &StakingPool): (u64, u64, u64, bool, bool) {
-        (
-            pool.total_staked,
-            balance::value(&pool.staking_balance),
-            balance::value(&pool.reward_pool),
-            pool.is_paused,
-            pool.emergency_mode
-        )
+    public fun get_pool_info(pool: &StakingPool): StakingPoolInfo {
+        StakingPoolInfo {
+            total_staked: pool.total_staked,
+            staking_balance: balance::value(&pool.staking_balance),
+            reward_pool_balance: balance::value(&pool.reward_pool),
+            is_paused: pool.is_paused,
+            emergency_mode: pool.emergency_mode,
+            min_stake_amount: pool.min_stake_amount,
+            max_stake_amount: pool.max_stake_amount,
+            max_pool_balance: pool.max_pool_balance,
+            max_stakes_per_user: pool.max_stakes_per_user
+        }
     }
 
     public fun get_stake_info(pool: &StakingPool, user: address, stake_index: u64): 
@@ -525,6 +554,61 @@ module stake::staking {
         event::emit(EmergencyActionEvent {
             action_type: 2, // 2 for resume
             amount: 0,
+            timestamp: clock::timestamp_ms(clock) / 1000
+        });
+    }
+
+    public entry fun update_stake_limits(
+        _admin_cap: &AdminCap,
+        pool: &mut StakingPool,
+        new_min_stake: u64,
+        new_max_stake: u64,
+        clock: &Clock
+    ) {
+        assert!(new_min_stake <= new_max_stake, EInvalidAmount);
+        pool.min_stake_amount = new_min_stake;
+        pool.max_stake_amount = new_max_stake;
+
+        event::emit(PoolLimitsUpdateEvent {
+            new_min_stake,
+            new_max_stake,
+            new_pool_balance: pool.max_pool_balance,
+            new_max_stakes: pool.max_stakes_per_user,
+            timestamp: clock::timestamp_ms(clock) / 1000
+        });
+    }
+
+    public entry fun update_pool_balance_limit(
+        _admin_cap: &AdminCap,
+        pool: &mut StakingPool,
+        new_max_pool_balance: u64,
+        clock: &Clock
+    ) {
+        assert!(new_max_pool_balance >= pool.total_staked, EInvalidAmount);
+        pool.max_pool_balance = new_max_pool_balance;
+
+        event::emit(PoolLimitsUpdateEvent {
+            new_min_stake: pool.min_stake_amount,
+            new_max_stake: pool.max_stake_amount,
+            new_pool_balance: new_max_pool_balance,
+            new_max_stakes: pool.max_stakes_per_user,
+            timestamp: clock::timestamp_ms(clock) / 1000
+        });
+    }
+
+    public entry fun update_max_stakes_per_user(
+        _admin_cap: &AdminCap,
+        pool: &mut StakingPool,
+        new_max_stakes: u64,
+        clock: &Clock
+    ) {
+        pool.max_stakes_per_user = new_max_stakes;
+
+        event::emit(PoolLimitsUpdateEvent {
+            new_min_stake: pool.min_stake_amount,
+            new_max_stake: pool.max_stake_amount,
+            new_pool_balance: pool.max_pool_balance,
+            new_max_stakes,
             timestamp: clock::timestamp_ms(clock) / 1000
         });
     }
