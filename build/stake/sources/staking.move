@@ -24,6 +24,7 @@ module stake::staking {
     const DAYS_PER_YEAR: u64 = 365;
     const SCALE: u64 = 10000; // For percentage calculations
     const COIN_DECIMALS: u64 = 6;
+    const DECIMAL_SCALING: u64 = 1000000; // 10^6
 
     // Staking periods in seconds
     const PERIOD_90_DAYS: u64 = 90 * SECONDS_PER_DAY;
@@ -31,9 +32,9 @@ module stake::staking {
     const PERIOD_365_DAYS: u64 = 365 * SECONDS_PER_DAY;
 
     // Configuration constants
-    const MIN_STAKE_AMOUNT: u64 = 100 * 10^COIN_DECIMALS; // 100 tokens with 6 decimals
-    const MAX_STAKE_AMOUNT: u64 = 100_000_000_000 * 10^COIN_DECIMALS; // 100,000 tokens
-    const MAX_POOL_BALANCE: u64 = 10_000_000_000_000 * 10^COIN_DECIMALS; // 10 Trillion tokens
+    const MIN_STAKE_AMOUNT: u64 = 100 * DECIMAL_SCALING; // 100 tokens with 6 decimals
+    const MAX_STAKE_AMOUNT: u64 = 1_000_000_000 * DECIMAL_SCALING; // 1B tokens
+    const MAX_POOL_BALANCE: u64 = 10_000_000_000_000 * DECIMAL_SCALING; // 10T tokens
     const MAX_STAKES_PER_USER: u64 = 10;
 
     public struct AdminCap has key, store {
