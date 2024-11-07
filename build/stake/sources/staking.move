@@ -37,9 +37,6 @@ module stake::staking {
     const MAX_POOL_BALANCE: u64 = 10_000_000_000_000 * DECIMAL_SCALING; // 10T tokens
     const MAX_STAKES_PER_USER: u64 = 10;
 
-    // Add new constant for cool period
-    const COOL_PERIOD: u64 = 3 * SECONDS_PER_DAY;
-
     public struct AdminCap has key, store {
         id: UID,
     }
@@ -245,7 +242,8 @@ module stake::staking {
                 }
             ],
             total_staked: 0,
-            unstake_delay: 1 * SECONDS_PER_DAY,
+            // unstake_delay: 1 * SECONDS_PER_DAY,
+            unstake_delay: 10,
             early_unstake_penalty_rate: 1000,
             is_paused: false,
             emergency_mode: false,
@@ -386,12 +384,6 @@ module stake::staking {
         
         let current_time = clock::timestamp_ms(clock) / 1000;
         
-        // Add cool period check
-        assert!(
-            current_time >= request.request_time + COOL_PERIOD,
-            EUnstakeDelayNotMet
-        );
-
         assert!(
             current_time >= request.request_time + pool.unstake_delay,
             EUnstakeDelayNotMet
