@@ -37,6 +37,9 @@ module stake::staking {
     const MAX_POOL_BALANCE: u64 = 10_000_000_000_000 * DECIMAL_SCALING; // 10T tokens
     const MAX_STAKES_PER_USER: u64 = 10;
 
+    // Add new constant for cool period
+    const COOL_PERIOD: u64 = 3 * SECONDS_PER_DAY;
+
     public struct AdminCap has key, store {
         id: UID,
     }
@@ -81,6 +84,7 @@ module stake::staking {
     }
 
     public struct Stake has store {
+        index: u64,
         user: address,
         amount: u64,
         start_time: u64,
@@ -107,6 +111,14 @@ module stake::staking {
         coin_package: address,
         coin_type: vector<u8>,
         coin_decimals: u64,
+    }
+
+    // Enhanced struct for detailed stake status
+    public struct StakeStatus has copy, drop {
+        is_mature: bool,
+        can_unstake: bool,
+        pending_reward: u64,
+        potential_penalty: u64
     }
 
     // Enhanced Events
@@ -155,6 +167,20 @@ module stake::staking {
         new_max_stake: u64,
         new_pool_balance: u64,
         new_max_stakes: u64,
+        timestamp: u64
+    }
+
+    public struct RewardPoolUpdateEvent has copy, drop {
+        amount_added: u64,
+        new_balance: u64,
+        timestamp: u64
+    }
+
+    // Add this new event struct with the other events
+    public struct RewardPoolWithdrawEvent has copy, drop {
+        amount_withdrawn: u64,
+        recipient: address,
+        remaining_balance: u64,
         timestamp: u64
     }
 
@@ -276,6 +302,7 @@ module stake::staking {
         
         // Create stake
         let stake = Stake {
+            index: stake_id,
             user: sender,
             amount,
             start_time: current_time,
@@ -358,6 +385,13 @@ module stake::staking {
         let request = table::borrow(user_requests, stake_index);
         
         let current_time = clock::timestamp_ms(clock) / 1000;
+        
+        // Add cool period check
+        assert!(
+            current_time >= request.request_time + COOL_PERIOD,
+            EUnstakeDelayNotMet
+        );
+
         assert!(
             current_time >= request.request_time + pool.unstake_delay,
             EUnstakeDelayNotMet
@@ -631,14 +665,6 @@ module stake::staking {
         current_time >= stake.end_time
     }
 
-    // Enhanced struct for detailed stake status
-    public struct StakeStatus has copy, drop {
-        is_mature: bool,
-        can_unstake: bool,
-        pending_reward: u64,
-        potential_penalty: u64
-    }
-
     public fun get_stake_status(
         pool: &StakingPool,
         user: address,
@@ -675,4 +701,54 @@ module stake::staking {
     public fun get_max_stake_amount(): u64 { MAX_STAKE_AMOUNT }
     public fun get_max_pool_balance(): u64 { MAX_POOL_BALANCE }
     public fun get_max_stakes_per_user(): u64 { MAX_STAKES_PER_USER }
+
+    // Add this function after the other admin functions
+    public entry fun add_to_reward_pool(
+        _admin_cap: &AdminCap,
+        pool: &mut StakingPool,
+        coins: Coin<TIU>,
+        clock: &Clock
+    ) {
+        let amount = coin::value(&coins);
+        assert!(amount > 0, EZeroAmount);
+        
+        // Add coins to reward pool
+        coin::put(&mut pool.reward_pool, coins);
+
+        // Emit event for tracking
+        event::emit(RewardPoolUpdateEvent {
+            amount_added: amount,
+            new_balance: balance::value(&pool.reward_pool),
+            timestamp: clock::timestamp_ms(clock) / 1000
+        });
+    }
+
+    // Add this function after add_to_reward_pool
+    public entry fun withdraw_from_reward_pool(
+        _admin_cap: &AdminCap,
+        pool: &mut StakingPool,
+        amount: u64,
+        recipient: address,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        // Validations
+        assert!(amount > 0, EZeroAmount);
+        let reward_balance = balance::value(&pool.reward_pool);
+        assert!(reward_balance >= amount, EInsufficientRewardPool);
+        
+        // Take coins from reward pool
+        let withdraw_coins = coin::take(&mut pool.reward_pool, amount, ctx);
+        
+        // Transfer to recipient
+        transfer::public_transfer(withdraw_coins, recipient);
+
+        // Emit withdrawal event
+        event::emit(RewardPoolWithdrawEvent {
+            amount_withdrawn: amount,
+            recipient,
+            remaining_balance: balance::value(&pool.reward_pool),
+            timestamp: clock::timestamp_ms(clock) / 1000
+        });
+    }
 }
