@@ -676,10 +676,19 @@ module stake::staking {
 
     // Utility Functions
     fun calculate_reward(stake: &Stake): u64 {
-        let base_reward = (stake.amount * stake.plan.apy * stake.plan.duration) / 
-            (DAYS_PER_YEAR * SECONDS_PER_DAY * SCALE);
+        // First divide amount by SCALE to reduce the multiplication size
+        let scaled_amount = stake.amount / SCALE;
         
-        // Add minimum check to ensure reward is not zero for valid stakes
+        // Then multiply by APY
+        let amount_with_apy = scaled_amount * stake.plan.apy;
+        
+        // Calculate time ratio to further reduce the size
+        let time_ratio = stake.plan.duration / (DAYS_PER_YEAR * SECONDS_PER_DAY);
+        
+        // Final calculation
+        let base_reward = amount_with_apy * time_ratio;
+        
+        // Add minimum check
         if (base_reward == 0 && stake.amount > 0 && stake.plan.apy > 0) {
             1
         } else {
