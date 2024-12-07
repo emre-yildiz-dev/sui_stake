@@ -22,6 +22,7 @@ module stake::staking {
     const EZeroAmount: u64 = 10;
     const EInvalidVersion: u64 = 11;
     const EWrongAdmin: u64 = 12;
+    const ENotEmergencyMode: u64 = 13;
 
     // Constants
     const SECONDS_PER_DAY: u64 = 86400;
@@ -475,7 +476,7 @@ module stake::staking {
         ctx: &mut TxContext
     ) {
         assert!(pool.version == VERSION, EInvalidVersion);
-        assert!(pool.emergency_mode, EUnauthorized);
+        assert!(pool.emergency_mode, ENotEmergencyMode);
         assert!(amount > 0, EZeroAmount);
         
         let coins = coin::take(&mut pool.staking_balance, amount, ctx);
