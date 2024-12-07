@@ -2,11 +2,11 @@
 
 [move]
 version = 3
-manifest_digest = "CF287C8AAC007744AD5027F2355EF7FE3A81DBEA2E48E5034549E786E47A7B26"
+manifest_digest = "187FE8A572B76A7C4FF51239E45DEE94A6BBADE9010C5896F436F07B86188F00"
 deps_digest = "3C4103934B1E040BB6B23F1D610B4EF9F2F1166A50A104EADCF77467C004C600"
 dependencies = [
   { id = "Sui", name = "Sui" },
-  { id = "tiu", name = "tiu" },
+  { id = "zzz", name = "zzz" },
 ]
 
 [[move.package]]
@@ -22,15 +22,15 @@ dependencies = [
 ]
 
 [[move.package]]
-id = "tiu"
-source = { git = "https://github.com/emre-yildiz-dev/sui_coin.git", rev = "main", subdir = "" }
+id = "zzz"
+source = { git = "https://github.com/emre-yildiz-dev/sui_coin.git", rev = "testnet", subdir = "" }
 
 dependencies = [
   { id = "Sui", name = "Sui" },
 ]
 
 [move.toolchain-version]
-compiler-version = "1.37.1"
+compiler-version = "1.38.3"
 edition = "2024.beta"
 flavor = "sui"
 
@@ -38,6 +38,12 @@ flavor = "sui"
 
 [env.testnet]
 chain-id = "4c78adac"
-original-published-id = "0x3941b674686ff23b4d3743a29905c32655bc8cafd779faebd0d4edaa14fe04f9"
-latest-published-id = "0x3941b674686ff23b4d3743a29905c32655bc8cafd779faebd0d4edaa14fe04f9"
+original-published-id = "0xf2c4d11b38916474ccc32285f9364611ea0f1ab4290f26a317c090c9d0853c50"
+latest-published-id = "0xf2c4d11b38916474ccc32285f9364611ea0f1ab4290f26a317c090c9d0853c50"
+published-version = "1"
+
+[env.mainnet]
+chain-id = "35834a8a"
+original-published-id = "0x92d23bdfe8ce92e295aba17564351c75bdc32de1a67b464d7a7d1c291cd3ab59"
+latest-published-id = "0x92d23bdfe8ce92e295aba17564351c75bdc32de1a67b464d7a7d1c291cd3ab59"
 published-version = "1"

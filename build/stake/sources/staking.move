@@ -4,7 +4,7 @@ module stake::staking {
     use sui::clock::{Self, Clock};
     use sui::table::{Self, Table};
     use sui::event;
-    use tiu::tiu::TIU;
+    use zzz::zzz::ZZZ;
 
     // Error codes
     const EStakerDoesNotExist: u64 = 0;
@@ -23,8 +23,8 @@ module stake::staking {
     const SECONDS_PER_DAY: u64 = 86400;
     const DAYS_PER_YEAR: u64 = 365;
     const SCALE: u64 = 10000; // For percentage calculations
-    const COIN_DECIMALS: u64 = 6;
-    const DECIMAL_SCALING: u64 = 1000000; // 10^6
+    const COIN_DECIMALS: u64 = 3;
+    const DECIMAL_SCALING: u64 = 1000; // 10^3
 
     // Staking periods in seconds
     const PERIOD_90_DAYS: u64 = 90 * SECONDS_PER_DAY;
@@ -32,10 +32,10 @@ module stake::staking {
     const PERIOD_365_DAYS: u64 = 365 * SECONDS_PER_DAY;
 
     // Configuration constants
-    const MIN_STAKE_AMOUNT: u64 = 100 * DECIMAL_SCALING; // 100 tokens with 6 decimals
-    const MAX_STAKE_AMOUNT: u64 = 1_000_000_000 * DECIMAL_SCALING; // 1B tokens
-    const MAX_POOL_BALANCE: u64 = 10_000_000_000_000 * DECIMAL_SCALING; // 10T tokens
-    const MAX_STAKES_PER_USER: u64 = 10;
+    const MIN_STAKE_AMOUNT: u64 = 10_000_000_000 * DECIMAL_SCALING; // 10B tokens
+    const MAX_STAKE_AMOUNT: u64 = 90_000_000_000_000 * DECIMAL_SCALING; // 90B tokens
+    const MAX_POOL_BALANCE: u64 = 900_000_000_000_000 * DECIMAL_SCALING; // 900B tokens
+    const MAX_STAKES_PER_USER: u64 = 100;
 
     public struct AdminCap has key, store {
         id: UID,
@@ -43,8 +43,8 @@ module stake::staking {
 
     public struct StakingPool has key {
         id: UID,
-        staking_balance: Balance<TIU>,
-        reward_pool: Balance<TIU>,
+        staking_balance: Balance<ZZZ>,
+        reward_pool: Balance<ZZZ>,
         stakes: Table<address, Table<u64, Stake>>,
         unstake_requests: Table<address, Table<u64, UnstakeRequest>>,
         staking_plans: vector<StakingPlan>,
@@ -189,13 +189,13 @@ module stake::staking {
     }
 
     fun initialize_staking_metadata(ctx: &mut TxContext) {
-        let tiu_package = @tui_package;
-        let mut tiu_package_str = tiu_package.to_string();
-        tiu_package_str.append_utf8(b"::tiu::TIU");
+        let zzz_package = @zzz_package;
+        let mut zzz_package_str = zzz_package.to_string();
+        zzz_package_str.append_utf8(b"::zzz::ZZZ");
         let staking_metadata = StakeMetadata {
             id: object::new(ctx),
-            coin_package: @tui_package,
-            coin_type: *tiu_package_str.as_bytes(),
+            coin_package: @zzz_package,
+            coin_type: *zzz_package_str.as_bytes(),
             coin_decimals: COIN_DECIMALS,
         };
         transfer::freeze_object(staking_metadata);
@@ -219,7 +219,7 @@ module stake::staking {
                 StakingPlan { 
                     index: 0, 
                     duration: PERIOD_90_DAYS, 
-                    apy: 1000, 
+                    apy: 500, 
                     is_active: true,
                     min_stake_amount: MIN_STAKE_AMOUNT,
                     max_stake_amount: MAX_STAKE_AMOUNT
@@ -227,7 +227,7 @@ module stake::staking {
                 StakingPlan { 
                     index: 1, 
                     duration: PERIOD_180_DAYS, 
-                    apy: 1500, 
+                    apy: 1000, 
                     is_active: true,
                     min_stake_amount: MIN_STAKE_AMOUNT,
                     max_stake_amount: MAX_STAKE_AMOUNT
@@ -235,7 +235,7 @@ module stake::staking {
                 StakingPlan { 
                     index: 2, 
                     duration: PERIOD_365_DAYS, 
-                    apy: 2000, 
+                    apy: 1500, 
                     is_active: true,
                     min_stake_amount: MIN_STAKE_AMOUNT,
                     max_stake_amount: MAX_STAKE_AMOUNT
@@ -243,8 +243,8 @@ module stake::staking {
             ],
             total_staked: 0,
             // unstake_delay: 1 * SECONDS_PER_DAY,
-            unstake_delay: 10,
-            early_unstake_penalty_rate: 1000,
+            unstake_delay: 3 * SECONDS_PER_DAY,
+            early_unstake_penalty_rate: 500,
             is_paused: false,
             emergency_mode: false,
             min_stake_amount: MIN_STAKE_AMOUNT,
@@ -257,7 +257,7 @@ module stake::staking {
 
     public entry fun stake(
         pool: &mut StakingPool,
-        coin: &mut Coin<TIU>,
+        coin: &mut Coin<ZZZ>,
         amount: u64,
         plan_index: u64,
         clock: &Clock,
@@ -657,7 +657,7 @@ module stake::staking {
         current_time >= stake.end_time
     }
 
-    public fun get_stake_status(
+    public entry fun get_stake_status(
         pool: &StakingPool,
         user: address,
         stake_index: u64,
@@ -698,7 +698,7 @@ module stake::staking {
     public entry fun add_to_reward_pool(
         _admin_cap: &AdminCap,
         pool: &mut StakingPool,
-        coins: Coin<TIU>,
+        coins: Coin<ZZZ>,
         clock: &Clock
     ) {
         let amount = coin::value(&coins);

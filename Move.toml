@@ -4,8 +4,8 @@ edition = "2024.beta"
 
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
-tiu = { git = "https://github.com/emre-yildiz-dev/sui_coin.git", rev = "main", override = true }
+zzz = { git = "https://github.com/emre-yildiz-dev/sui_coin.git", rev = "testnet", override = true }
 
 [addresses]
 stake = "0x0"
-tui_package = "0x6191d8290c1ffb048a61922657a7171f14eb003e644ee6c45ab2b2204200acab"
+zzz_package = "0xbd8943f76a5f1d0bee0be620eaff9d92a4b5b84f2817b980150277f8c3ad891b"
