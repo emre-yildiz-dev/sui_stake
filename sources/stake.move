@@ -21,6 +21,7 @@ module stake::staking {
     const EUnauthorized: u64 = 9;
     const EZeroAmount: u64 = 10;
     const EInvalidVersion: u64 = 11;
+    const EWrongAdmin: u64 = 12;
 
     // Constants
     const SECONDS_PER_DAY: u64 = 86400;
@@ -188,11 +189,19 @@ module stake::staking {
 
     fun init(ctx: &mut TxContext) {
         let sender = tx_context::sender(ctx);
+
+        // Initialize staking metadata
         initialize_staking_metadata(ctx);
+
+        // Create and transfer admin cap
           let admin_cap = AdminCap {
             id: object::new(ctx),
         };
+
+        // Initialize staking pool
         initialize_staking_pool_and_transfer(object::id(&admin_cap), ctx);
+
+        // Transfer admin cap
         transfer::public_transfer(admin_cap, sender);
     }
 
@@ -770,12 +779,12 @@ module stake::staking {
     }
 
     // Migrate functions
-    public entry fun migrate_pool(
+    public entry fun migrate(
         _admin_cap: &AdminCap,
         pool: &mut StakingPool,
     ) {
         assert!(pool.version < VERSION, EInvalidVersion);
-        assert!(pool.admin_id == object::id(_admin_cap), EUnauthorized);
+        assert!(pool.admin_id == object::id(_admin_cap), EWrongAdmin);
 
         pool.version = VERSION;
     }
