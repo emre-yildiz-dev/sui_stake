@@ -23,6 +23,7 @@ module stake::staking {
     const EInvalidVersion: u64 = 11;
     const EWrongAdmin: u64 = 12;
     const ENotEmergencyMode: u64 = 13;
+    const EInvalidPreviousVersion: u64 = 14;
 
     // Constants
     const SECONDS_PER_DAY: u64 = 86400;
@@ -797,5 +798,16 @@ module stake::staking {
         assert!(pool.admin_id == object::id(_admin_cap), EWrongAdmin);
 
         pool.version = VERSION;
+    }
+
+    public entry fun revert_to_previous_version(
+        _admin_cap: &AdminCap,
+        pool: &mut StakingPool,
+        previous_version: u64
+    ) {
+        assert!(pool.version > 0, EInvalidVersion);
+        assert!(previous_version > 0, EInvalidPreviousVersion);
+
+        pool.version = previous_version;
     }
 }
